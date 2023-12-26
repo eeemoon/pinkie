@@ -1,0 +1,17 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "pinkie"
+version = "0.0.1"
+homepage = "https://github.com/EeeMoon/pinkie"
+description = "All-in-one solution for color management."
+authors = ["EeeMoon"]
+license = "MIT"
+readme = "README.md"
+include = ["pyproject.toml", "LICENSE"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
