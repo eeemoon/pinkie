@@ -1,6 +1,7 @@
+from typing import Callable
 from collections.abc import Sequence
 
-from .utils import BlendMode
+from .blend import BlendMode
 
 
 class RGBA:
@@ -245,24 +246,10 @@ class RGBA:
         
         maxv = self._max_one
 
-        # TODO
+
         def apply_blend(first, second):
             result = 0
-
-            match mode:
-                case "normal":
-                    result = second
-                case "multiply":
-                    result = (first * second) // maxv
-                case "screen":
-                    result = maxv - (((maxv - first) * (maxv - second)) // maxv)
-                case "overlay":
-                    if first < 128:
-                        result = (2 * first * second) // maxv
-                    else:
-                        result = maxv - (2 * (maxv - first) * (maxv - second)) // maxv
-                case _:
-                    raise ValueError(f"invalid blend mode: {mode}")
+            
                                 
             return result
 
