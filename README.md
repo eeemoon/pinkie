@@ -70,12 +70,14 @@ and create your own blending mode:
 ```python
 class MyBlend(blend.BlendMode):
     """
-    Blend mode that always return white.
+    Blend mode that always return (r1, g2, b1, a2).
     """
     def blend(self, bg, fg):
         # specifying 'bits' is important if you want
         # to blend mode work correctly with any color
-        return Color('ffffff', bits=self.bits)
+        return Color((
+            bg.r, fg.g, bg.r, fg.a
+        ), bits=self.bits)
 
 bg.blend(fg, MyBlend)
 ```

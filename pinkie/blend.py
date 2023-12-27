@@ -1,7 +1,7 @@
 class BlendMode:
     """
     Base class for blending mode. 
-    Inherited classes should only have overwritten `blend()` method.
+    Inherited classes should have overwritten `blend()` method.
     """
     def __init__(self, bits: int) -> None:
         self.bits = bits
@@ -20,7 +20,7 @@ class BlendMode:
     
 class Normal(BlendMode):
     """
-    Normal blend mode.
+    Normal blending mode.
     """
     def blend(self, bg, fg):
         from .rgba import RGBA

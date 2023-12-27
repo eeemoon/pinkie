@@ -187,16 +187,21 @@ class HSLA:
         color.h += 180
         return color
     
-    def split_complementary(self, angle: int = 30) -> list["HSLA"]:
-        color = self.complementary()
-        
-        color_1 = color.copy()
-        color_1.h += angle
+    def range(self, num: int = 2, angle: int = 360) -> list["HSLA"]:
+        ang = angle / (num + 1)
+        result = []
 
-        color_2 = color.copy()
-        color_2.h -= angle
+        compl = self.complementary()
 
-        return [color_1, color_2]
+        for i in range(0, num):
+            a = ang * i + ang
+
+            current = compl.copy()
+            current.h += a
+
+            result.append(current)
+            
+        return result
     
     @staticmethod
     def random(
