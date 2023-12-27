@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 class HSLA:
     """
-    `HSLA` (Hue, Saturation, Lightness, Alpha) color format.
+    `HSLA` (Hue, Saturation, Lightness, Alpha) color model.
     """
     __slots__ = ('_h', '_s', '_l', '_a')
 
@@ -119,6 +119,7 @@ class HSLA:
 
     alpha = a
 
+    # formats
     @property
     def hsl(self) -> tuple[int, int, int]:
         """
@@ -148,9 +149,9 @@ class HSLA:
 
     def to_rgba(self):
         """
-        Convert the color to `RGBA` format.
+        Convert the color to `RGBA` model.
         """
-        from .rgba import RGBA8U
+        from .rgba import RGBA
 
         h = self.h / 360.0
         s = self.s / 100.0
@@ -178,7 +179,7 @@ class HSLA:
             g = hue_to_rgb(p, q, h) * 255
             b = hue_to_rgb(p, q, h - 1/3) * 255
 
-        return RGBA8U((r, g, b, self.a * 2.55))
+        return RGBA((r, g, b, self.a * 2.55))
 
     # utils
     def complementary(self) -> "HSLA":

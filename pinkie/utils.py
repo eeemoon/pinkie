@@ -1,13 +1,4 @@
-from typing import Literal
-
-
-BlendMode = Literal[
-    'normal',
-    'darken',
-    'multiply',
-    'overlay',
-    'screen'
-]
+import math
 
 
 class classproperty:
@@ -17,3 +8,6 @@ class classproperty:
     def __get__(self, instance, owner):
         return self.fget(owner)
     
+
+def distance(first, second):
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(first, second)))
