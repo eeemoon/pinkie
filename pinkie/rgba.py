@@ -72,10 +72,10 @@ class RGBA:
         return isinstance(other, RGBA) and self.value <= other.value
     
     def __gt__(self, other):
-        return isinstance(other, RGBA) and self.value > other.value
+        return not self <= other 
     
     def __ge__(self, other):
-        return isinstance(other, RGBA) and self.value >= other.value
+        return not self < other 
 
     def __str__(self) -> str:
         return f"rgba{self.rgba}"
@@ -97,7 +97,7 @@ class RGBA:
             yield item
     
     # private methods
-    def _get_mask(self, pos):
+    def _bit_mask(self, pos):
         n = self._bits
         res = bin(self._max_all)
         res = res[:n * pos + 2] + '0' * n + res[n * (pos + 1) + 2:]
@@ -124,7 +124,7 @@ class RGBA:
 
     @r.setter
     def r(self, value: int):
-        self.value = (self.value & self._get_mask(3)) | min(int(value), self._max_one)
+        self.value = (self.value & self._bit_mask(3)) | min(int(value), self._max_one)
 
     red = r
 
@@ -139,7 +139,7 @@ class RGBA:
 
     @g.setter
     def g(self, value: int):
-        self.value = (self.value & self._get_mask(2)) | (min(int(value), self._max_one) << self._bits)
+        self.value = (self.value & self._bit_mask(2)) | (min(int(value), self._max_one) << self._bits)
 
     @property
     def b(self) -> int:
@@ -150,7 +150,7 @@ class RGBA:
 
     @b.setter
     def b(self, value: int):
-        self.value = (self.value & self._get_mask(1)) | (min(int(value), self._max_one) << self._bits * 2)
+        self.value = (self.value & self._bit_mask(1)) | (min(int(value), self._max_one) << self._bits * 2)
 
     blue = b
 
@@ -163,7 +163,7 @@ class RGBA:
 
     @a.setter
     def a(self, value: int):
-        self.value = (self.value & self._get_mask(0)) | (min(int(value), self._max_one) << self._bits * 3)
+        self.value = (self.value & self._bit_mask(0)) | (min(int(value), self._max_one) << self._bits * 3)
 
     alpha = a
 
@@ -215,7 +215,7 @@ class RGBA:
         g = self.g / self._max_one
         b = self.b / self._max_one
 
-        cmax = min(r, g, b)
+        cmax = max(r, g, b)
         cmin = min(r, g, b)
         delta = cmax - cmin
 
@@ -238,12 +238,29 @@ class RGBA:
     
     def to_web(self):
         """
-        Convert the color to the closest web-safe color.
+        Get the closest web-safe color.
         """
         from .palette import Palette
 
         return self.closest(Palette.web().colors)
     
+    def convert(self, bits: int):
+        """
+        Convert the color to another bit count.
+
+        Attributes
+        ----------
+        bits: `int`
+            Number of bits per channel. Must be factor of 4. 
+        """
+        scale = 2 ** (bits - self.bits)
+        maxv = 2 ** bits - 1
+
+        return RGBA([
+            min(i * scale, maxv)
+            for i in self.rgba
+        ], bits=bits)
+
     # utils
     def is_light(self, threshold: int | None = None) -> bool:
         """
@@ -255,23 +272,36 @@ class RGBA:
             Method returns lightness > threshold. 
             If `None`, equals to half of the max value.
         """
-        return (
+        brightness = (
             0.299 * (self.r * self.r) 
             + 0.587 * (self.g * self.g) 
             + 0.114 * (self.b * self.b)
-        ) > (self._max_one / 2 if threshold is None else threshold) ** 2
+        )
+
+        return brightness > (self._max_one / 2 if threshold is None else threshold) ** 2
             
     def complementary(self):
         """
         Get a complementary color.
         """
-        return self.to_hsla().complementary().to_rgba()
+        return RGBA([self._max_one - i for i in self.rgba], bits=self.bits)
     
-    def split_complementary(self, angle: int = 30):
+    def color_scheme(self, num: int = 1):
+        if num < 1:
+            raise ValueError("Number of colors must be at least 1.")
+
+        complementary_color = RGBA([self._max_one - i for i in self.rgba], bits=self.bits)
+        triadic_colors = [complementary_color]
+        for _ in range(num - 1):
+            triadic_colors.append(RGBA([self._max_one - i for i in complementary_color.rgba], bits=self.bits))
+        
+        return triadic_colors
+    
+    def split_complementary(self, num, angle: int = 30):
         """
         Get two complementary colors.
         """
-        return [i.to_rgba() for i in self.to_hsla().split_complementary(angle)]
+        return [i.to_rgba() for i in self.to_hsla().range(num, angle)]
     
     def closest(self, colors: list["RGBA"]):
         """
