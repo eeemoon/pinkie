@@ -317,7 +317,7 @@ class RGBA:
 
         return min(colors, key=lambda c: distance(self, c))
     
-    def blend(self, other: "RGBA", mode):
+    def blend(self, other: "RGBA", mode) -> "RGBA":
         from .blend import BlendMode
 
         if not issubclass(mode, BlendMode):
