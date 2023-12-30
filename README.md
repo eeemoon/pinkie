@@ -4,10 +4,10 @@
 All-in-one solution for color management.
 
 ## Features
-- Simple pythonic way to manage colors
-- Multiple models (RGB, HSL, HEX) and conversions
-- Palettes and schemes and color generators
-- Many blending modes
+- Simple and pythonic way to manage colors
+- Multiple models (`RGB`, `HSL`, `CMYK`, `HEX`) and conversions
+- Palettes, schemes and color generators
+- Color blending with many modes
 - Supports alpha (transparency) channel
 
 ## Installation
@@ -34,29 +34,27 @@ Color('#ff53a7') # hex value ('#' is automatically stripped)
 Color('ff53a7f6') # hex value with alpha
 Color(43252667) # int value
 HSLA(259, 94, 47).to_rgba() # hsl value
-# etc
+...
 ```
-and define colors with another bit count for channel
+and define colors with another bit count for channel:
 ```python
-Color((34832, 632, 65103)) # rgb tuple
+Color((34832, 632, 65103), bits=16) # rgb tuple
 Color('ff53a7cc671a', bits=16) # hex value
 Color('ff53a7cc671a12e3', bits=16) # hex value with alpha
-# etc
+...
 ```
 
-### Color representation
-Color values can be accessed like this:
+### Color conversions
+Color models can be converted to `RGBA` and back:
 ```python
-color.rgba # rgba tuple
-color.rgb # rgb tuple
-color.hex # hex value
-color.red # red value
-color.r # also red value
-# etc
+Color('ff00ff').to_hsla() 
+Color('157cc3').to_cmyk()
+HSLA('44c26b').to_rgba()
+...
 ```
 
 ### Color blending
-You can blend colors like in Photoshop
+You can blend colors like in Photoshop:
 ```python
 import pinkie.blend as blend
 from pinkie import Color
@@ -69,23 +67,31 @@ bg.blend(fg, blend.Normal) # FF7269FF
 and create your own blending mode:
 ```python
 class MyBlend(blend.BlendMode):
-    """
-    Blend mode that always return (r1, g2, b1, a2).
-    """
-    def blend(self, bg, fg):
-        # specifying 'bits' is important if you want
-        # to blend mode work correctly with any color
-        return Color((
-            bg.r, fg.g, bg.r, fg.a
-        ), bits=self.bits)
+    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
+        return bg * fg
 
 bg.blend(fg, MyBlend)
 ```
 
-### Linked colors
-There are various methods to get nice-looking colors
+### Harmonic colors
+There are various methods to get harmonic colors:
 ```python
 color.complementary() # complementary color
-color.split_complementary() # 2 split complementary colors
+color.triadic() # list of triadic colors
 color.closest([Color('ffffff'), Color('000000')]) # closest color from the list
+...
+```
+
+### Color palettes
+Palettes are just a sequences of colors. You can manage them like this:
+```python
+from pinkie import Color, Palette
+
+palette = Palette([Color('ffffff'), Color('4c66a1')])
+palette.add(Color('16c235'))
+palette.remove(Color('ffffff'))
+
+Palette.web() # palette of web-safe colors
+Palette.gradient(Color('ff0000'), Color('0000ff'), 5) # palette of colors that create gradient from red to blue
+...
 ```
