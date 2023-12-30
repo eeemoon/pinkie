@@ -293,7 +293,7 @@ class RGBA:
         Attributes
         ----------
         threshold: `int` | `None`
-            Method returns lightness > threshold. 
+            If brightness is greater than it, method will return `True`.
             If `None`, equals to half of the max value.
         """
         return self.brightness > (self._max_one / 2 if threshold is None else threshold) ** 2
