@@ -8,5 +8,8 @@ venv/
 *.pyc
 dist/
 
+# ide files
+.vscode/
+
 # utils
 git-filter-repo
