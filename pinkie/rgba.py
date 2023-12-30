@@ -1,5 +1,5 @@
-import math
-from collections.abc import Sequence
+import random
+from typing import Sequence
 
 from .utils import distance
 
@@ -21,6 +21,10 @@ class RGBA:
         bits: `int`
             Number of bits per channel. Must be factor of 4.
             Default is 8 bits that equals 256 values per channel.
+
+        Raises
+        ------
+        `ValueError` if the color is invalid.
         """
         self.bits = bits
         self._max_one = 2 ** bits - 1
@@ -43,7 +47,7 @@ class RGBA:
             case int():
                 self.value = color
         
-            case Sequence():
+            case list() | tuple():
                 num = len(color)
                 if num not in {3, 4}:
                     raise ValueError(f"invalid color sequence: {color}")
@@ -64,18 +68,6 @@ class RGBA:
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
-    
-    def __lt__(self, other):
-        return isinstance(other, RGBA) and self.value < other.value
-    
-    def __le__(self, other):
-        return isinstance(other, RGBA) and self.value <= other.value
-    
-    def __gt__(self, other):
-        return not self <= other 
-    
-    def __ge__(self, other):
-        return not self < other 
 
     def __str__(self) -> str:
         return f"rgba{self.rgba}"
@@ -195,6 +187,14 @@ class RGBA:
         Color as 'rrggbbaa' string.
         """
         return f'{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}'
+    
+    @property
+    def brightness(self) -> float:
+        return (
+            0.299 * (self.r * self.r) 
+            + 0.587 * (self.g * self.g) 
+            + 0.114 * (self.b * self.b)
+        )
 
     # converters
     def copy(self):
@@ -236,13 +236,30 @@ class RGBA:
 
         return HSLA((h, s * 100, l * 100, self.a / self._max_one * 100))
     
+    def to_cmyk(self):
+        """
+        Convert the color to `CMYK` model.
+        """
+        from .cmyk import CMYK
+
+        max_channel = max(self.rgb)
+        k = 1 - max_channel / self._max_one
+
+        if k == 1:
+            return CMYK((0, 0, 0, 100))
+
+        return CMYK([
+            (1 - i / self._max_one - k) / (1 - k) * 100
+            for i in self.rgb
+        ] + [k * 100])
+    
     def to_web(self):
         """
         Get the closest web-safe color.
         """
         from .palette import Palette
 
-        return self.closest(Palette.web().colors)
+        return self.closest(Palette.web()._items)
     
     def convert(self, bits: int):
         """
@@ -272,38 +289,47 @@ class RGBA:
             Method returns lightness > threshold. 
             If `None`, equals to half of the max value.
         """
-        brightness = (
-            0.299 * (self.r * self.r) 
-            + 0.587 * (self.g * self.g) 
-            + 0.114 * (self.b * self.b)
-        )
+        return self.brightness > (self._max_one / 2 if threshold is None else threshold) ** 2
+    
+    def is_web(self) -> bool:
+        """
+        Determines if color is web-safe.
+        """
+        from .palette import Palette
 
-        return brightness > (self._max_one / 2 if threshold is None else threshold) ** 2
+        return self in Palette.web()
             
-    def complementary(self):
+    def complementary(self) -> "RGBA":
         """
         Get a complementary color.
         """
-        return RGBA([self._max_one - i for i in self.rgba], bits=self.bits)
+        return self.to_hsla().complementary().to_rgba()
     
-    def color_scheme(self, num: int = 1):
-        if num < 1:
-            raise ValueError("Number of colors must be at least 1.")
-
-        complementary_color = RGBA([self._max_one - i for i in self.rgba], bits=self.bits)
-        triadic_colors = [complementary_color]
-        for _ in range(num - 1):
-            triadic_colors.append(RGBA([self._max_one - i for i in complementary_color.rgba], bits=self.bits))
-        
-        return triadic_colors
-    
-    def split_complementary(self, num, angle: int = 30):
+    def split_complementary(self) -> list["RGBA"]:
         """
-        Get two complementary colors.
+        Get 2 split complementary colors.
         """
-        return [i.to_rgba() for i in self.to_hsla().range(num, angle)]
+        return [i.to_rgba() for i in self.to_hsla().split_complementary()]
     
-    def closest(self, colors: list["RGBA"]):
+    def triadic(self) -> list["RGBA"]:
+        """
+        Get 2 triadic colors.
+        """
+        return [i.to_rgba() for i in self.to_hsla().triadic()]
+    
+    def tetradic(self) -> list["RGBA"]:
+        """
+        Get 3 tetradic colors.
+        """
+        return [i.to_rgba() for i in self.to_hsla().tetradic()]
+    
+    def analogous(self) -> list["RGBA"]:
+        """
+        Get 3 analogous colors.
+        """
+        return [i.to_rgba() for i in self.to_hsla().analogous()]
+    
+    def closest(self, colors: list["RGBA"]) -> "RGBA":
         """
         Select closest color from the list.
 
@@ -311,19 +337,46 @@ class RGBA:
         ----------
         colors: list[RGBA]
             List of colors.
+
+        Raises
+        ------
+        `ValueError` if the list of colors is empty.
         """        
         if len(colors) == 0:
-            raise ValueError("can not choose color from empty list")
+            raise ValueError("unable to choose color from an empty list")
 
         return min(colors, key=lambda c: distance(self, c))
     
     def blend(self, other: "RGBA", mode) -> "RGBA":
+        """
+        Blend the color with another color. 
+        Note that the other color will be placed on top of this.
+
+        Attributes
+        ----------
+        other: `RGBA`
+            Foreground color.
+        mode: `BlendMode`
+            Blending mode. Must be a child class of `BlendMode`.
+
+        Raises
+        ------
+        `ValueError` if the mode is invalid or bit counts of the colors do not match.
+        """
         from .blend import BlendMode
 
         if not issubclass(mode, BlendMode):
             raise ValueError(f"blend mode must be inherited from the {BlendMode.__name__} class")
 
         return mode(self.bits).compose(self, other)
+    
+    # color generators
+    @staticmethod
+    def random(bits: int = 8) -> "RGBA":
+        return RGBA([
+            random.randint(0, 2 ** bits - 1)
+            for _ in range(4)
+        ], bits=bits)
 
 
 Color = RGBA
