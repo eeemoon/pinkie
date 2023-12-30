@@ -1,17 +1,32 @@
-class Palette:
-    _web = None
+from typing import Iterable
 
-    def __init__(self, colors: list) -> None:
+
+class Palette:
+    """
+    `RGBA` Color palette.
+    """
+    _web: "Palette" = None
+
+    def __init__(self, colors: Iterable) -> None:
+        """
+        Palette constructor.
+
+        Attributes
+        ----------
+        colors: `Iterable[RGBA]`
+            List of colors.
+
+        Raises
+        ------
+        `ValueError` if the any of the colors is not `RGBA` instance.
+        """
         from .rgba import RGBA
 
-        self.colors = []
-        self._bits = 0
+        self._items: list[RGBA] = []
+        self._bits: int = 0
 
-        for c in colors:
-            if not isinstance(c, RGBA) or (self._bits and c.bits != self._bits):
-                raise ValueError("colors must be instances of RGBA")
-            
-            self.colors.append(c)
+        for color in colors:
+            self.add(color)
 
     # magic methods
     def __eq__(self, other) -> bool:
@@ -34,20 +49,59 @@ class Palette:
         return not self < other
 
     def __str__(self) -> str:
-        return f"Palette(num={len(self.colors)})"
+        return f"Palette(num={len(self._items)})"
 
     def __repr__(self) -> str:
-        return f"<Palette colors={self.colors}>"
+        return f"<Palette colors={self._items}>"
 
     def __hash__(self) -> int:
         return hash(self.value)
     
     def __getitem__(self, key):
-        return self.colors[key]
+        return self._items[key]
     
     def __iter__(self):
-        for item in self.colors:
+        for item in self._items:
             yield item
+
+    def _check(self, color):
+        from .rgba import RGBA
+        
+        if not isinstance(color, RGBA) or (self._bits and color.bits != self._bits):
+            raise ValueError("color must be instance of RGBA and have same bit count")
+
+    # attributes
+    def add(self, color) -> None:
+        """
+        Add a color to the palette.
+
+        Attributes
+        ----------
+        color: `RGBA`
+            Color to add.
+
+        Raises
+        ------
+        `ValueError` if the color is invalid.
+        """
+        self._check(color)
+        self._items.append(color)
+
+    def remove(self, color) -> None:
+        """
+        Remove the color to the palette.
+
+        Attributes
+        ----------
+        color: `RGBA`
+            Color to remove.
+
+        Raises
+        ------
+        `ValueError` if the color is not present or is invalid.
+        """
+        self._check(color)
+        self._items.remove(color)
 
     # palette generators
     @staticmethod
@@ -69,16 +123,40 @@ class Palette:
     
     @staticmethod
     def random(num: int) -> "Palette":
+        """
+        Generate a palette with random colors.
+
+        Attributes
+        ----------
+        num: `int`
+            Number of colors.
+        """
         from .hsla import HSLA
 
         return Palette(HSLA.random().to_rgba() for _ in range(num))
     
     @staticmethod
     def gradient(start, end, num: int) -> "Palette":
+        """
+        Generate a palette with colors that create gradient from start to end.
+
+        Attributes
+        ----------
+        start: `RGBA`
+            Start color.
+        end: `RGBA`
+            End color.
+        num: `int`
+            Number of colors.
+
+        Raises
+        ------
+        `ValueError` if the number < 2.
+        """
         from .rgba import RGBA
 
         if num < 2:
-            raise ValueError("number of colors can not be smaller than 2")
+            raise ValueError("number of colors must be greater than or equal to 2")
 
         def interpolate(start, end, step):
             return int(start + (end - start) * step)

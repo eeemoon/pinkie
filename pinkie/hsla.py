@@ -1,5 +1,5 @@
 import random
-from collections.abc import Sequence
+from typing import Sequence
 
 
 class HSLA:
@@ -16,6 +16,10 @@ class HSLA:
         ----------
         color: `Sequence`
             Color sequence of h, s, l and optional a.
+
+        Raises
+        ------
+        `ValueError` if the color is invalid.
         """
         match color:
             case tuple() | list():
@@ -32,18 +36,6 @@ class HSLA:
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
-    
-    def __lt__(self, other):
-        return isinstance(other, HSLA) and self.s + self.a < other.s + other.a
-    
-    def __le__(self, other):
-        return isinstance(other, HSLA) and self.s + self.a <= other.s + other.a
-    
-    def __gt__(self, other):
-        return isinstance(other, HSLA) and self.s + self.a > other.s + other.a
-    
-    def __ge__(self, other):
-        return isinstance(other, HSLA) and self.s + self.a >= other.s + other.a
 
     def __str__(self) -> str:
         return f"hsla{self.hsla}"
@@ -182,35 +174,64 @@ class HSLA:
         return RGBA((r, g, b, self.a * 2.55))
 
     # utils
+    def range(self, num: int, step: int, angle: int) -> list["HSLA"]:
+        """
+        Get a list of circular colors.
+
+        Attributes
+        ----------
+        num: `int`
+            Number of colors.
+        step: `int`
+            Angle in degrees.
+        angle: `int`
+            Start angle.
+        """
+        result = []
+
+        for i in range(num):
+            co = self.copy()
+            co.h = angle + step * i
+            result.append(co)
+
+        return result
+
     def complementary(self) -> "HSLA":
+        """
+        Get a complementary color.
+        """
         color = self.copy()
         color.h += 180
         return color
     
-    def range(self, num: int = 2, angle: int = 360) -> list["HSLA"]:
-        ang = angle / (num + 1)
-        result = []
-
-        compl = self.complementary()
-
-        for i in range(0, num):
-            a = ang * i + ang
-
-            current = compl.copy()
-            current.h += a
-
-            result.append(current)
-            
-        return result
+    def split_complementary(self) -> list["HSLA"]:
+        """
+        Get 2 split complementary colors.
+        """
+        return self.range(2, 60, self.h + 150)
     
+    def triadic(self) -> list["HSLA"]:
+        """
+        Get 2 triadic colors.
+        """
+        return self.range(2, 120, self.h + 120)
+    
+    def tetradic(self) -> list["HSLA"]:
+        """
+        Get 3 tetradic colors.
+        """
+        return self.range(3, 90, self.h + 90)
+    
+    def analogous(self) -> list["HSLA"]:
+        """
+        Get 3 analogous colors.
+        """
+        return self.range(3, 30, self.h - 30)
+    
+    # color generators
     @staticmethod
-    def random(
-        h: tuple[int, int] = (0, 359),
-        s: tuple[int, int] = (0, 100),
-        l: tuple[int, int] = (0, 100),
-        a: tuple[int, int] = (0, 100)
-    ):
+    def random() -> "HSLA":
         return HSLA([
-            random.randint(*i) if isinstance(i, tuple) else i
-            for i in (h, s, l, a)
+            random.randint(0, i)
+            for i in (360, 100, 100, 100)
         ])

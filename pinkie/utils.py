@@ -1,13 +1,9 @@
 import math
+from typing import Iterable
 
 
-class classproperty:
-    def __init__(self, func):
-        self.fget = func
-
-    def __get__(self, instance, owner):
-        return self.fget(owner)
-    
-
-def distance(first, second):
+def distance(first: Iterable, second: Iterable):
+    """
+    Get Euclidean distance for 2 iterables.
+    """
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(first, second)))

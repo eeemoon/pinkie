@@ -45,10 +45,14 @@ class BlendMode:
 
         Attributes
         ----------
-        bg: `Color`
+        bg: `RGBA`
             Background color.
-        fg: `Color`
+        fg: `RGBA`
             Foreground color.
+
+        Raises
+        ------
+        `ValueError` if bit counts of the colors do not match.
         """
         from .rgba import RGBA
 
@@ -143,13 +147,13 @@ class Overlay(BlendMode):
     Overlay blending mode.
     """
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if bg * 2 <= bg_a:
-            return fg * bg * 2 + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-        else:
+        if bg * 2 > bg_a:
             return (
                 self.comp(fg, bg_a) + self.comp(bg, fg_a) 
                 - 2 * (bg_a - bg) * (fg_a - fg) + fg_a * bg_a
             )
+        else:
+            return fg * bg * 2 + self.comp(fg, bg_a) + self.comp(bg, fg_a)
         
 
 class SoftLight(BlendMode):
@@ -178,13 +182,13 @@ class HardLight(BlendMode):
     Hard Light blending mode.
     """
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if fg * 2 <= fg_a:
-            return 2 * fg * bg + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-        else:
+        if fg * 2 > fg_a:
             return (
                 fg_a * bg_a - 2 * (bg_a - bg) * (fg_a - fg) 
                 + self.comp(fg, bg_a) + self.comp(bg, fg_a)
             )
+        else:
+            return 2 * fg * bg + self.comp(fg, bg_a) + self.comp(bg, fg_a)
         
         
 class Difference(BlendMode):
