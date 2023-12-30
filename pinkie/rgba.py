@@ -338,7 +338,7 @@ class RGBA:
     
     def closest(self, colors: list["RGBA"]) -> "RGBA":
         """
-        Select closest color from the list.
+        Select the closest color to this from the list.
 
         Attributes
         ----------
@@ -350,9 +350,27 @@ class RGBA:
         `ValueError` if the list of colors is empty.
         """        
         if len(colors) == 0:
-            raise ValueError("unable to choose color from an empty list")
+            raise ValueError("unable to choose a color from an empty list")
 
         return min(colors, key=lambda c: distance(self, c))
+    
+    def futhest(self, colors: list["RGBA"]) -> "RGBA":
+        """
+        Select the futhest color to this from the list.
+
+        Attributes
+        ----------
+        colors: list[RGBA]
+            List of colors.
+
+        Raises
+        ------
+        `ValueError` if the list of colors is empty.
+        """        
+        if len(colors) == 0:
+            raise ValueError("unable to choose a color from an empty list")
+
+        return max(colors, key=lambda c: distance(self, c))
     
     def blend(self, other: "RGBA", mode) -> "RGBA":
         """
