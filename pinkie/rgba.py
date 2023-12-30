@@ -189,11 +189,18 @@ class RGBA:
         return f'{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}'
     
     @property
-    def brightness(self) -> float:
-        return (
-            0.299 * (self.r * self.r) 
-            + 0.587 * (self.g * self.g) 
-            + 0.114 * (self.b * self.b)
+    def brightness(self) -> int:
+        """
+        Get a perceived brightness of the color.
+        `HSP` color model is used for the calculation.
+        """
+        return round(
+            (
+                0.299 * ((self.r / self._max_one) ** 2) 
+                + 0.587 * ((self.g / self._max_one) ** 2) 
+                + 0.114 * ((self.b / self._max_one) ** 2)
+            ) 
+            * self._max_one
         )
 
     # converters
