@@ -33,10 +33,10 @@ Color((244, 11, 58, 215)) # rgba tuple
 Color('#ff53a7') # hex value ('#' is automatically stripped)
 Color('ff53a7f6') # hex value with alpha
 Color(43252667) # int value
-HSLA(259, 94, 47).to_rgba() # hsl value
+HSLA((259, 94, 47)).to_rgba() # hsl value
 ...
 ```
-and define colors with another bit count for channel:
+and define colors with another bit count per channel:
 ```python
 Color((34832, 632, 65103), bits=16) # rgb tuple
 Color('ff53a7cc671a', bits=16) # hex value
@@ -83,7 +83,7 @@ color.closest([Color('ffffff'), Color('000000')]) # closest color from the list
 ```
 
 ### Color palettes
-Palettes are just a sequences of colors. You can manage them like this:
+Palettes are just sequences of colors. You can manage them like this:
 ```python
 from pinkie import Color, Palette
 
