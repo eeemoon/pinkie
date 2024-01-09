@@ -8,7 +8,7 @@ class RGBA:
     """
     `RGBA` (Red, Green, Blue, Alpha) color model.
     """
-    __slots__ = ('value', '_bits', '_max_one', '_max_all')
+    __slots__ = ('_data', '_bits', '_max_one', '_max_all')
 
     def __init__(self, color: int | str | Sequence, /, bits: int = 8) -> None:
         """
@@ -36,8 +36,8 @@ class RGBA:
                 chars = bits // 4
                 if num not in {bits, chars * 3}:
                     raise ValueError(f"invalid hex value: {color}")
-                
-                self.value = (
+                                
+                self._data = (
                     (int(color[:chars], base=16))
                     + (int(color[chars : chars * 2], base=16) << bits)
                     + (int(color[chars * 2 : chars * 3], base=16) << (bits * 2))
@@ -45,14 +45,19 @@ class RGBA:
                 )
 
             case int():
-                self.value = color
-        
+                self._data = (
+                    ((color & self._max_one) << (bits * 2))
+                    + (((color >> bits) & self._max_one) << bits)
+                    + (((color >> (bits * 2)) & self._max_one))
+                    + (self._max_one << (bits * 3))
+                )
+                        
             case list() | tuple():
                 num = len(color)
                 if num not in {3, 4}:
                     raise ValueError(f"invalid color sequence: {color}")
 
-                self.value = (
+                self._data = (
                     min(int(color[0]), self._max_one)
                     + (min(int(color[1]), self._max_one) << bits) 
                     + (min(int(color[2]), self._max_one) << bits * 2) 
@@ -64,7 +69,7 @@ class RGBA:
     
     # magic methods
     def __eq__(self, other) -> bool:
-        return isinstance(other, RGBA) and self.value == other.value
+        return isinstance(other, RGBA) and self._data == other._data
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
@@ -73,13 +78,13 @@ class RGBA:
         return f"rgba{self.rgba}"
 
     def __int__(self) -> int:
-        return self.value
+        return self._data
 
     def __repr__(self) -> str:
-        return f"<RGBA value={self.value}, bits={self._bits}>"
+        return f"<RGBA value={self._data}, bits={self._bits}>"
 
     def __hash__(self) -> int:
-        return hash(self.value)
+        return hash(self._data)
     
     def __getitem__(self, key):
         return self.rgba[key]
@@ -112,11 +117,11 @@ class RGBA:
         """
         Red value.
         """
-        return (self.value) & self._max_one
+        return (self._data) & self._max_one
 
     @r.setter
     def r(self, value: int):
-        self.value = (self.value & self._bit_mask(3)) | min(int(value), self._max_one)
+        self._data = (self._data & self._bit_mask(3)) | min(int(value), self._max_one)
 
     red = r
 
@@ -125,24 +130,24 @@ class RGBA:
         """
         Green value.
         """
-        return (self.value >> self._bits) & self._max_one
+        return (self._data >> self._bits) & self._max_one
     
     green = g
 
     @g.setter
     def g(self, value: int):
-        self.value = (self.value & self._bit_mask(2)) | (min(int(value), self._max_one) << self._bits)
+        self._data = (self._data & self._bit_mask(2)) | (min(int(value), self._max_one) << self._bits)
 
     @property
     def b(self) -> int:
         """
         Blue value.
         """
-        return (self.value >> self._bits * 2) & self._max_one
+        return (self._data >> self._bits * 2) & self._max_one
 
     @b.setter
     def b(self, value: int):
-        self.value = (self.value & self._bit_mask(1)) | (min(int(value), self._max_one) << self._bits * 2)
+        self._data = (self._data & self._bit_mask(1)) | (min(int(value), self._max_one) << self._bits * 2)
 
     blue = b
 
@@ -151,11 +156,11 @@ class RGBA:
         """
         Alpha value (transparency).
         """
-        return (self.value >> self._bits * 3) & self._max_one
+        return (self._data >> self._bits * 3) & self._max_one
 
     @a.setter
     def a(self, value: int):
-        self.value = (self.value & self._bit_mask(0)) | (min(int(value), self._max_one) << self._bits * 3)
+        self._data = (self._data & self._bit_mask(0)) | (min(int(value), self._max_one) << self._bits * 3)
 
     alpha = a
 
@@ -189,6 +194,10 @@ class RGBA:
         return f'{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}'
     
     @property
+    def value(self) -> int:
+        return (self.r << (self.bits * 2)) + (self.g << self.bits) + self.b
+    
+    @property
     def brightness(self) -> int:
         """
         Get a perceived brightness of the color.
@@ -209,7 +218,7 @@ class RGBA:
         Get a copy of the color.
         """
         obj = RGBA.__new__(RGBA)
-        obj.value = self.value
+        obj._data = self._data
         return obj
     
     def to_hsla(self):
@@ -296,7 +305,7 @@ class RGBA:
             If brightness is greater than it, method will return `True`.
             If `None`, equals to half of the max value.
         """
-        return self.brightness > (self._max_one / 2 if threshold is None else threshold) ** 2
+        return self.brightness > (self._max_one / 2 if threshold is None else threshold)
     
     def is_web(self) -> bool:
         """
