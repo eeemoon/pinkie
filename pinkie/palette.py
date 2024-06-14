@@ -6,7 +6,7 @@ from .rgba import RGBA
 class Palette:
     """`RGBA` Color palette."""
 
-    _web: Palette | None
+    _web: Palette | None = None
 
     def __init__(self, *colors: RGBA) -> None:
         """
@@ -132,19 +132,19 @@ class Palette:
         return cls(*(RGBA.random() for _ in range(num)))
     
     @classmethod
-    def gradient(cls, start: RGBA, end: RGBA, num: int) -> "Palette":
+    def gradient(cls, num: int, *, start: RGBA, end: RGBA) -> "Palette":
         """
         Generate a palette with colors that create gradient.
 
         Parameters
         ----------
+        num: `int`
+            Number of colors.
         start: `RGBA`
             Start color.
         end: `RGBA`
             End color.
-        num: `int`
-            Number of colors.
-
+        
         Raises
         ------
         `ValueError`
