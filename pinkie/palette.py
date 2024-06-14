@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from .rgba import RGBA
 
 
 class Palette:
     """`RGBA` Color palette."""
 
-    _web: "Palette" | None = None
+    _web: Palette | None
 
     def __init__(self, *colors: RGBA) -> None:
         """
@@ -24,7 +26,7 @@ class Palette:
         self._bits: int | None = None
 
         for color in colors:
-            self.add(color)
+            self.add_color(color)
 
     def __eq__(self, other) -> bool:
         return (
@@ -63,7 +65,7 @@ class Palette:
         
         self._bits = value
 
-    def add(self, color: RGBA, /) -> None:
+    def add_color(self, color: RGBA, /) -> None:
         """
         Add a color to the palette.
 
@@ -85,7 +87,7 @@ class Palette:
         if not self.bits:
             self.bits = color.bits
 
-    def remove(self, color: RGBA) -> None:
+    def remove_color(self, color: RGBA) -> None:
         """
         Remove the color from the palette.
 
@@ -162,3 +164,4 @@ class Palette:
         ]
 
         return Palette(*gradient)
+    
