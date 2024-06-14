@@ -9,7 +9,7 @@ class RGBA:
 
     __slots__ = ('_data', '_bits', '_max_one', '_max_all')
 
-    def __init__(self, color: int | str | Sequence[int], /, *, bits: int = 8) -> None:
+    def __init__(self, color: int | str | Sequence[int], /, bits: int = 8) -> None:
         """
         Parameters
         ----------
@@ -25,30 +25,32 @@ class RGBA:
             If the color is invalid.
         """
         self.bits: int = bits
-        self._max_one: int = 2 ** bits - 1
-        self._max_all: int = 2 ** (bits * 4) - 1
+        self._max_one: int = (1 << bits) - 1
+        self._max_all: int = (1 << (bits * 4)) - 1
 
-        if isinstance(color, str):
-            chars = self.bits // 4
-            if len(color) not in {chars * 3, chars * 4}:
+        if isinstance(color, int):
+            self._data = (color & self._max_all) | (self._max_one << (self.bits * 3))
+        elif isinstance(color, str):
+            color = color.removeprefix('#')
+            
+            per_channel = self.bits // 4
+            if len(color) not in {per_channel * 3, per_channel * 4}:
                 raise ValueError(f"Invalid hex value: {color}")
             
-            if len(color) == chars * 3:
-                color += 'F' * chars
+            if len(color) == per_channel * 3:
+                color += 'F' * per_channel
             
             self._data = int(color, 16)
-        elif isinstance(color, int):
-            self._data = (color & self._max_all) | (self._max_one << (self.bits * 3))
         elif isinstance(color, Sequence):
-            if len(color) not in {3, 4}:
+            if len(color) not in {3, 4} or not all(isinstance(i, int) for i in color):
                 raise ValueError(f"Invalid color sequence: {color}")
             
             if len(color) == 3:
                 color = (*color, self._max_one)
             
             self._data = sum(
-                min(max(c, 0), self._max_one) << (i * self.bits) 
-                for i, c in enumerate(color)
+                min(max(c, 0), self._max_one) << (num * self.bits) 
+                for num, c in enumerate(color)
             )
         else:
             raise ValueError(f"Invalid color value: {color}")
@@ -101,64 +103,64 @@ class RGBA:
     @property
     def r(self) -> int:
         """Red value."""
-        return self._channel_value(0)
+        return self._channel_value(3)
 
     @r.setter
     def r(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Value must be an int, not {type(value).__name__}")
-        self._set_channel_value(0, value)
+        self._set_channel_value(3, value)
 
     red = r
 
     @property
     def g(self) -> int:
         """Green value."""
-        return self._channel_value(1)
+        return self._channel_value(2)
 
     @g.setter
     def g(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Value must be an int, not {type(value).__name__}")
-        self._set_channel_value(1, value)
+        self._set_channel_value(2, value)
 
     green = g
 
     @property
     def b(self) -> int:
         """Blue value."""
-        return self._channel_value(2)
+        return self._channel_value(1)
 
     @b.setter
     def b(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Value must be an int, not {type(value).__name__}")
-        self._set_channel_value(2, value)
+        self._set_channel_value(1, value)
 
     blue = b
 
     @property
     def a(self) -> int:
         """Alpha value (transparency)."""
-        return self._channel_value(3)
+        return self._channel_value(0)
 
     @a.setter
     def a(self, value: int):
         if not isinstance(value, int):
             raise TypeError(f"Value must be an int, not {type(value).__name__}")
-        self._set_channel_value(3, value)
+        self._set_channel_value(0, value)
 
     alpha = a
 
     @property
     def rgb(self) -> tuple[int, int, int]:
         """`(r, g, b)` tuple."""
-        return (self.r, self.g, self.b)
+        return self.r, self.g, self.b
 
     @property
     def rgba(self) -> tuple[int, int, int, int]:
         """`(r, g, b, a)` tuple."""
-        return (self.r, self.g, self.b, self.a)
+        return self.r, self.g, self.b, self.a
 
     @property
     def hex(self) -> str:
@@ -178,7 +180,7 @@ class RGBA:
     @property
     def value(self) -> int:
         """Integer value of RGB. Does not contain alpha."""
-        self._data & ((1 << (self.bits * 3)) - 1)
+        return self._data >> self.bits
     
     @property
     def brightness(self) -> int:
@@ -191,10 +193,9 @@ class RGBA:
 
     def copy(self) -> "RGBA":
         """Get a copy of the color."""
-        cls = type(self)
-        obj = cls.__new__(cls)
+        obj = RGBA.__new__(RGBA)
         obj._data = self._data
-        obj.bits = self.bits
+        obj._bits = self._bits
         return obj
     
     def to_hsla(self):
@@ -202,7 +203,8 @@ class RGBA:
         from .hsla import HSLA
 
         r, g, b = (c / self._max_one for c in self.rgb)
-        cmax, cmin = max(r, g, b), min(r, g, b)
+        cmax = max(r, g, b)
+        cmin = min(r, g, b)
         delta = cmax - cmin
 
         l = (cmax + cmin) / 2
@@ -216,19 +218,27 @@ class RGBA:
             elif cmax == b:
                 h = 60 * ((r - g) / delta + 4)
 
-        return HSLA((h, s * 100, l * 100, self.a / self._max_one * 100))
+        return HSLA((
+            round(h), 
+            round(s * 100), 
+            round(l * 100), 
+            round(self.a / self._max_one * 100)
+        ))
     
     def to_cmyk(self):
         """Convert to `CMYK` color model."""
         from .cmyk import CMYK
 
-        max_channel = max(self.rgb)
-        k = 1 - max_channel / self._max_one
+        rgb = self.rgb
+        cmax = max(rgb)
+        k = 1 - cmax / self._max_one
 
         if k == 1:
             return CMYK((0, 0, 0, 100))
+        
+        c, m, y = ((1 - i / self._max_one - k) / (1 - k) for i in rgb)
 
-        return CMYK([(1 - i / self._max_one - k) / (1 - k) * 100 for i in self.rgb] + [k * 100])
+        return CMYK([round(i * 100) for i in [c, m, y, k]])
     
     def convert(self, bits: int) -> "RGBA":
         """
@@ -294,7 +304,7 @@ class RGBA:
 
         return min(colors, key=lambda c: distance(self, c))
     
-    def futhest(self, *colors: "RGBA") -> "RGBA":
+    def furthest(self, *colors: "RGBA") -> "RGBA":
         """
         Select the furthest color to this one.
 
