@@ -19,7 +19,7 @@ class HSLA:
         `ValueError` 
             If the color is invalid.
         """
-        if isinstance(color, Sequence):
+        if isinstance(color, Sequence) and len(color) in {3, 4}:
             self.h = color[0]
             self.s = color[1]
             self.l = color[2]
@@ -151,7 +151,12 @@ class HSLA:
             g = hue_to_rgb(p, q, h) * 255
             b = hue_to_rgb(p, q, h - 1/3) * 255
 
-        return RGBA((r, g, b, self.a * 2.55))
+        return RGBA((
+            round(r), 
+            round(g), 
+            round(b), 
+            round(self.a * 2.55)
+        ))
 
     def range(
         self, 
