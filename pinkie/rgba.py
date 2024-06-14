@@ -169,7 +169,7 @@ class RGBA:
     
     @property
     def hexa(self) -> str:
-        """HEXA string."""
+        """HEX string with alpha."""
         return f"{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}"
     
     @property
@@ -181,15 +181,6 @@ class RGBA:
     def value(self) -> int:
         """Integer value of RGB. Does not contain alpha."""
         return self._data >> self.bits
-    
-    @property
-    def brightness(self) -> int:
-        """Perceived brightness according to the HSP color model."""
-        return round(
-            0.299 * ((self.r / self._max_one) ** 2)
-            + 0.587 * ((self.g / self._max_one) ** 2)
-            + 0.114 * ((self.b / self._max_one) ** 2)
-        ) * self._max_one
 
     def copy(self) -> "RGBA":
         """Get a copy of the color."""
@@ -252,18 +243,26 @@ class RGBA:
         scale = (1 << bits) // (1 << self.bits)
         maxv = (1 << bits) - 1
         return RGBA([min(i * scale, maxv) for i in self.rgba], bits=bits)
+    
+    def normalize(self) -> tuple[float, float, float, float]:
+        """Normalize RGBA to `0-1` range."""
+        return tuple(i / self._max_one for i in self.rgba)
+    
+    def brightness(self) -> int:
+        """Get a perceived brightness in range `0-1`."""
+        r, g, b, _ = self.normalize()
+        return 0.299 * r ** 2 + 0.587 * g ** 2 + 0.114 * b ** 2
 
-    def is_light(self, threshold: int | None = None) -> bool:
+    def is_light(self, threshold: float = 0.5) -> bool:
         """
         Determines if color is light based on HSP color model.
 
         Parameters
         ----------
-        threshold: `int` | `None`
-            If brightness is greater than it, method will return `True`.
-            If `None`, sets to a half of the max value.
+        threshold: `float`
+            Brightness threshold.
         """
-        return self.brightness > (self._max_one / 2 if threshold is None else threshold)
+        return self.brightness() > threshold
             
     def complementary(self) -> "RGBA":
         """Get the complementary color."""
