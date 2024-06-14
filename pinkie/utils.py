@@ -1,9 +1,16 @@
 import math
-from typing import Iterable
+from typing import Sequence
 
 
-def distance(first: Iterable, second: Iterable):
+def distance(p1: Sequence, p2: Sequence, /) -> float:
     """
-    Get Euclidean distance for 2 iterables.
+    Get the Euclidean distance for 2 sequences.
+
+    Parameters
+    ----------
+    p1: `Sequence`
+        First point.
+    p2: `Sequence`
+        Second point.
     """
-    return math.sqrt(sum((a - b) ** 2 for a, b in zip(first, second)))
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(p1, p2)))

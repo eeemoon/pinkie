@@ -6,68 +6,55 @@ from .utils import distance
 
 class RGBA:
     """
-    `RGBA` (Red, Green, Blue, Alpha) color model.
+    RGBA (Red, Green, Blue, Alpha) color model.
     """
+
     __slots__ = ('_data', '_bits', '_max_one', '_max_all')
 
-    def __init__(self, color: int | str | Sequence, /, bits: int = 8) -> None:
+    def __init__(self, color: int | str | Sequence[int], /, *, bits: int = 8) -> None:
         """
-        `RGBA` color constructor.
-
-        Attributes
+        Parameters
         ----------
-        color: `int` | `str` | `Sequence`
-            Color value, hex or sequence of r, g, b and optional a.
+        color: `int` | `str` | `Sequence[int]`
+            Decimal value, hex or a sequence of r, g, b and optional a.
         bits: `int`
-            Number of bits per channel. Must be factor of 4.
-            Default is 8 bits that equals 256 values per channel.
+            Number of bits per channel. Must be a multiple of 4.
+            Defaults to 8 bits, which equals 256 values per channel.
 
         Raises
         ------
-        `ValueError` if the color is invalid.
+        `ValueError`
+            If the color is invalid.
         """
-        self.bits = bits
-        self._max_one = 2 ** bits - 1
-        self._max_all = 2 ** (bits * 4) - 1
+        self.bits: int = bits
+        self._max_one: int = 2 ** bits - 1
+        self._max_all: int = 2 ** (bits * 4) - 1
 
-        match color:
-            case str():
-                num = len(color)
-                chars = bits // 4
-                if num not in {bits, chars * 3}:
-                    raise ValueError(f"invalid hex value: {color}")
-                                
-                self._data = (
-                    (int(color[:chars], base=16))
-                    + (int(color[chars : chars * 2], base=16) << bits)
-                    + (int(color[chars * 2 : chars * 3], base=16) << (bits * 2))
-                    + ((int(color[chars * 3 :], base=16) if num == bits else self._max_one) << bits * 3)
-                )
+        if isinstance(color, str):
+            chars = self.bits // 4
+            if len(color) not in {chars * 3, chars * 4}:
+                raise ValueError(f"Invalid hex value: {color}")
+            
+            if len(color) == chars * 3:
+                color += 'F' * chars
+            
+            self._data = int(color, 16)
+        elif isinstance(color, int):
+            self._data = (color & self._max_all) | (self._max_one << (self.bits * 3))
+        elif isinstance(color, Sequence):
+            if len(color) not in {3, 4}:
+                raise ValueError(f"Invalid color sequence: {color}")
+            
+            if len(color) == 3:
+                color = (*color, self._max_one)
+            
+            self._data = sum(
+                min(max(c, 0), self._max_one) << (i * self.bits) 
+                for i, c in enumerate(color)
+            )
+        else:
+            raise ValueError(f"Invalid color value: {color}")
 
-            case int():
-                self._data = (
-                    ((color & self._max_one) << (bits * 2))
-                    + (((color >> bits) & self._max_one) << bits)
-                    + (((color >> (bits * 2)) & self._max_one))
-                    + (self._max_one << (bits * 3))
-                )
-                        
-            case list() | tuple():
-                num = len(color)
-                if num not in {3, 4}:
-                    raise ValueError(f"invalid color sequence: {color}")
-
-                self._data = (
-                    min(int(color[0]), self._max_one)
-                    + (min(int(color[1]), self._max_one) << bits) 
-                    + (min(int(color[2]), self._max_one) << bits * 2) 
-                    + ((min(int(color[3]), self._max_one) if num == 4 else self._max_one) << bits * 3)
-                )
-
-            case _:
-                raise ValueError(f"invalid color value: {color}")
-    
-    # magic methods
     def __eq__(self, other) -> bool:
         return isinstance(other, RGBA) and self._data == other._data
 
@@ -81,7 +68,7 @@ class RGBA:
         return self._data
 
     def __repr__(self) -> str:
-        return f"<RGBA value={self._data}, bits={self._bits}>"
+        return f"<RGBA value={self._data}, bits={self.bits}>"
 
     def __hash__(self) -> int:
         return hash(self._data)
@@ -92,157 +79,138 @@ class RGBA:
     def __iter__(self):
         for item in self.rgba:
             yield item
-    
-    # private methods
-    def _bit_mask(self, pos):
-        n = self._bits
-        res = bin(self._max_all)
-        res = res[:n * pos + 2] + '0' * n + res[n * (pos + 1) + 2:]
-        return int(res, 2)
 
-    # attributes
+    def _channel_value(self, pos: int) -> int:
+        return (self._data >> (pos * self.bits)) & self._max_one
+
+    def _set_channel_value(self, pos: int, value: int) -> None:
+        val = min(max(value, 0), self._max_one)
+        shift = pos * self.bits
+        mask = ~(self._max_one << shift)
+        self._data = (self._data & mask) | (val << shift)
+
     @property
-    def bits(self):
+    def bits(self) -> int:
         return self._bits
     
     @bits.setter
     def bits(self, value: int):
         if value % 4 != 0 or value < 4:
-            raise ValueError(f"number of bits must be factor of 4")
+            raise ValueError(f"Number of bits must be factor of 4")
         
         self._bits = value
 
     @property
     def r(self) -> int:
-        """
-        Red value.
-        """
-        return (self._data) & self._max_one
+        """Red value."""
+        return self._channel_value(0)
 
     @r.setter
     def r(self, value: int):
-        self._data = (self._data & self._bit_mask(3)) | min(int(value), self._max_one)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._set_channel_value(0, value)
 
     red = r
 
     @property
     def g(self) -> int:
-        """
-        Green value.
-        """
-        return (self._data >> self._bits) & self._max_one
-    
-    green = g
+        """Green value."""
+        return self._channel_value(1)
 
     @g.setter
     def g(self, value: int):
-        self._data = (self._data & self._bit_mask(2)) | (min(int(value), self._max_one) << self._bits)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._set_channel_value(1, value)
+
+    green = g
 
     @property
     def b(self) -> int:
-        """
-        Blue value.
-        """
-        return (self._data >> self._bits * 2) & self._max_one
+        """Blue value."""
+        return self._channel_value(2)
 
     @b.setter
     def b(self, value: int):
-        self._data = (self._data & self._bit_mask(1)) | (min(int(value), self._max_one) << self._bits * 2)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._set_channel_value(2, value)
 
     blue = b
 
     @property
     def a(self) -> int:
-        """
-        Alpha value (transparency).
-        """
-        return (self._data >> self._bits * 3) & self._max_one
+        """Alpha value (transparency)."""
+        return self._channel_value(3)
 
     @a.setter
     def a(self, value: int):
-        self._data = (self._data & self._bit_mask(0)) | (min(int(value), self._max_one) << self._bits * 3)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._set_channel_value(3, value)
 
     alpha = a
 
-    # formats
     @property
     def rgb(self) -> tuple[int, int, int]:
-        """
-        Color as `(r, g, b)` tuple.
-        """
+        """`(r, g, b)` tuple."""
         return (self.r, self.g, self.b)
 
     @property
     def rgba(self) -> tuple[int, int, int, int]:
-        """
-        Color as `(r, g, b, a)` tuple.
-        """
+        """`(r, g, b, a)` tuple."""
         return (self.r, self.g, self.b, self.a)
 
     @property
     def hex(self) -> str:
-        """
-        Color as `'rrggbb'` string.
-        """
-        return f'{self.r:02X}{self.g:02X}{self.b:02X}'
+        """HEX string."""
+        return f"{self.r:02X}{self.g:02X}{self.b:02X}"
     
     @property
     def hexa(self) -> str:
-        """
-        Color as 'rrggbbaa' string.
-        """
-        return f'{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}'
+        """HEXA string."""
+        return f"{self.r:02X}{self.g:02X}{self.b:02X}{self.a:02X}"
+    
+    @property
+    def decimal(self) -> int:
+        """Integer value of RGBA."""
+        return self._data
     
     @property
     def value(self) -> int:
-        return (self.r << (self.bits * 2)) + (self.g << self.bits) + self.b
+        """Integer value of RGB. Does not contain alpha."""
+        self._data & ((1 << (self.bits * 3)) - 1)
     
     @property
     def brightness(self) -> int:
-        """
-        Get a perceived brightness of the color.
-        `HSP` color model is used for the calculation.
-        """
+        """Perceived brightness according to the HSP color model."""
         return round(
-            (
-                0.299 * ((self.r / self._max_one) ** 2) 
-                + 0.587 * ((self.g / self._max_one) ** 2) 
-                + 0.114 * ((self.b / self._max_one) ** 2)
-            ) 
-            * self._max_one
-        )
+            0.299 * ((self.r / self._max_one) ** 2)
+            + 0.587 * ((self.g / self._max_one) ** 2)
+            + 0.114 * ((self.b / self._max_one) ** 2)
+        ) * self._max_one
 
-    # converters
-    def copy(self):
-        """
-        Get a copy of the color.
-        """
-        obj = RGBA.__new__(RGBA)
+    def copy(self) -> "RGBA":
+        """Get a copy of the color."""
+        cls = type(self)
+        obj = cls.__new__(cls)
         obj._data = self._data
+        obj.bits = self.bits
         return obj
     
     def to_hsla(self):
-        """
-        Convert the color to `HSLA` model.
-        """
+        """Convert to `HSLA` color model."""
         from .hsla import HSLA
 
-        r = self.r / self._max_one
-        g = self.g / self._max_one
-        b = self.b / self._max_one
-
-        cmax = max(r, g, b)
-        cmin = min(r, g, b)
+        r, g, b = (c / self._max_one for c in self.rgb)
+        cmax, cmin = max(r, g, b), min(r, g, b)
         delta = cmax - cmin
 
-        l = (cmax + cmin) / 2.0
-
-        s = 0.0
-        if delta != 0.0:
-            s = delta / (1 - abs(2 * l - 1))
-
-        h = 0.0
-        if delta != 0.0:
+        l = (cmax + cmin) / 2
+        s = delta / (1 - abs(2 * l - 1)) if delta != 0 else 0
+        h = 0
+        if delta != 0:
             if cmax == r:
                 h = 60 * ((g - b) / delta % 6)
             elif cmax == g:
@@ -253,9 +221,7 @@ class RGBA:
         return HSLA((h, s * 100, l * 100, self.a / self._max_one * 100))
     
     def to_cmyk(self):
-        """
-        Convert the color to `CMYK` model.
-        """
+        """Convert to `CMYK` color model."""
         from .cmyk import CMYK
 
         max_channel = max(self.rgb)
@@ -264,129 +230,98 @@ class RGBA:
         if k == 1:
             return CMYK((0, 0, 0, 100))
 
-        return CMYK([
-            (1 - i / self._max_one - k) / (1 - k) * 100
-            for i in self.rgb
-        ] + [k * 100])
+        return CMYK([(1 - i / self._max_one - k) / (1 - k) * 100 for i in self.rgb] + [k * 100])
     
-    def to_web(self):
-        """
-        Get the closest web-safe color.
-        """
-        from .palette import Palette
-
-        return self.closest(Palette.web()._items)
-    
-    def convert(self, bits: int):
+    def convert(self, bits: int) -> "RGBA":
         """
         Convert the color to another bit count.
 
-        Attributes
+        Parameters
         ----------
         bits: `int`
             Number of bits per channel. Must be factor of 4. 
         """
-        scale = 2 ** (bits - self.bits)
-        maxv = 2 ** bits - 1
+        scale = (1 << bits) // (1 << self.bits)
+        maxv = (1 << bits) - 1
+        return RGBA([min(i * scale, maxv) for i in self.rgba], bits=bits)
 
-        return RGBA([
-            min(i * scale, maxv)
-            for i in self.rgba
-        ], bits=bits)
-
-    # utils
     def is_light(self, threshold: int | None = None) -> bool:
         """
         Determines if color is light based on HSP color model.
 
-        Attributes
+        Parameters
         ----------
         threshold: `int` | `None`
             If brightness is greater than it, method will return `True`.
-            If `None`, equals to half of the max value.
+            If `None`, sets to a half of the max value.
         """
         return self.brightness > (self._max_one / 2 if threshold is None else threshold)
-    
-    def is_web(self) -> bool:
-        """
-        Determines if color is web-safe.
-        """
-        from .palette import Palette
-
-        return self in Palette.web()
             
     def complementary(self) -> "RGBA":
-        """
-        Get a complementary color.
-        """
+        """Get the complementary color."""
         return self.to_hsla().complementary().to_rgba()
     
     def split_complementary(self) -> list["RGBA"]:
-        """
-        Get 2 split complementary colors.
-        """
+        """Get 2 split-complementary colors."""
         return [i.to_rgba() for i in self.to_hsla().split_complementary()]
     
     def triadic(self) -> list["RGBA"]:
-        """
-        Get 2 triadic colors.
-        """
+        """Get 2 triadic colors."""
         return [i.to_rgba() for i in self.to_hsla().triadic()]
     
     def tetradic(self) -> list["RGBA"]:
-        """
-        Get 3 tetradic colors.
-        """
+        """Get 3 tetradic colors."""
         return [i.to_rgba() for i in self.to_hsla().tetradic()]
     
     def analogous(self) -> list["RGBA"]:
-        """
-        Get 3 analogous colors.
-        """
+        """Get 3 analogous colors."""
         return [i.to_rgba() for i in self.to_hsla().analogous()]
     
-    def closest(self, colors: list["RGBA"]) -> "RGBA":
+    def closest(self, *colors: "RGBA") -> "RGBA":
         """
-        Select the closest color to this from the list.
+        Select the closest color to this one.
 
-        Attributes
+        Parameters
         ----------
-        colors: list[RGBA]
+        *colors: `RGBA`
             List of colors.
 
         Raises
         ------
-        `ValueError` if the list of colors is empty.
+        `ValueError` 
+            If no colors specified.
         """        
         if len(colors) == 0:
-            raise ValueError("unable to choose a color from an empty list")
+            raise ValueError("Specify at least 1 color")
 
         return min(colors, key=lambda c: distance(self, c))
     
-    def futhest(self, colors: list["RGBA"]) -> "RGBA":
+    def futhest(self, *colors: "RGBA") -> "RGBA":
         """
-        Select the futhest color to this from the list.
+        Select the furthest color to this one.
 
-        Attributes
+        Parameters
         ----------
-        colors: list[RGBA]
+        *colors: `RGBA`
             List of colors.
 
         Raises
         ------
-        `ValueError` if the list of colors is empty.
+        `ValueError` 
+            If no colors specified.
         """        
         if len(colors) == 0:
-            raise ValueError("unable to choose a color from an empty list")
+            raise ValueError("Specify at least 1 color")
 
         return max(colors, key=lambda c: distance(self, c))
     
+    # TODO
     def blend(self, other: "RGBA", mode) -> "RGBA":
         """
-        Blend the color with another color. 
-        Note that the other color will be placed on top of this.
+        Blend the color with another one. 
+        Second color will be placed on top of this.
 
-        Attributes
+        Parameters
         ----------
         other: `RGBA`
             Foreground color.
@@ -395,7 +330,8 @@ class RGBA:
 
         Raises
         ------
-        `ValueError` if the mode is invalid or bit counts of the colors do not match.
+        `ValueError` 
+            If the mode is invalid or bit counts of the colors do not match.
         """
         from .blend import BlendMode
 
@@ -404,13 +340,20 @@ class RGBA:
 
         return mode(self.bits).compose(self, other)
     
-    # color generators
-    @staticmethod
-    def random(bits: int = 8) -> "RGBA":
-        return RGBA([
-            random.randint(0, 2 ** bits - 1)
-            for _ in range(4)
-        ], bits=bits)
+    @classmethod
+    def random(cls, bits: int = 8) -> "RGBA":
+        """
+        Generate a random color.
+
+        Parameters
+        ----------
+        bits: `int`
+            Number of bits.
+        """
+        return cls(
+            [random.randint(0, 2 ** bits - 1) for _ in range(4)], 
+            bits=bits
+        )
 
 
 Color = RGBA

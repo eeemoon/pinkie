@@ -3,6 +3,7 @@ class BlendMode:
     The base class for blending modes. 
     Inherited classes must have overwritten `blend()` method.
     """
+
     def __init__(self, bits: int) -> None:
         self.bits = bits
         self.max_one = 2 ** bits - 1
@@ -13,9 +14,9 @@ class BlendMode:
         Calculate the result value for each channel.
         All arguments are in range `0-1`.
 
-        Attributes
+        Parameters
         ----------
-        bg: `float`
+        bg: :class:`float`
             Background channel value.
         fg: `float`
             Foreground channel value.
@@ -75,6 +76,7 @@ class Normal(BlendMode):
     """
     Normal blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return fg * fg_a + self.comp(bg, fg_a)
     
@@ -83,6 +85,7 @@ class Darken(BlendMode):
     """
     Darken blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return min(fg * bg_a, bg * fg_a) + self.comp(fg, bg_a) + self.comp(bg, fg_a);
 
@@ -91,6 +94,7 @@ class Multiply(BlendMode):
     """
     Multiply blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return fg * bg + self.comp(fg, bg_a) + self.comp(bg, fg_a)
     
@@ -99,6 +103,7 @@ class ColorBurn(BlendMode):
     """
     Color Burn blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         if fg == 0:
             if bg == bg_a:
@@ -116,6 +121,7 @@ class Lighten(BlendMode):
     """
     Lighten blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return max(fg * bg_a, bg * fg_a) + self.comp(fg, bg_a) + self.comp(bg, fg_a);
     
@@ -124,6 +130,7 @@ class Screen(BlendMode):
     """
     Screen blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return 1 - (1 - bg * bg_a) * (1 - fg * fg_a)
 
@@ -132,6 +139,7 @@ class ColorDodge(BlendMode):
     """
     Color Dodge blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         if fg == fg_a:
             if bg == 0:
@@ -146,6 +154,7 @@ class Overlay(BlendMode):
     """
     Overlay blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         if bg * 2 > bg_a:
             return (
@@ -160,6 +169,7 @@ class SoftLight(BlendMode):
     """
     Soft Light blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         fg_n = fg / fg_a
 
@@ -181,6 +191,7 @@ class HardLight(BlendMode):
     """
     Hard Light blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         if fg * 2 > fg_a:
             return (
@@ -195,6 +206,7 @@ class Difference(BlendMode):
     """
     Difference blending mode.
     """
+
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return fg + bg - 2 * min(fg * bg_a, bg * fg_a);
 
@@ -203,6 +215,7 @@ class Exclusion(BlendMode):
     """
     Exclusion blending mode.
     """
+    
     def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
         return (
             (fg * bg_a + bg * fg_a - 2 * fg * bg) 

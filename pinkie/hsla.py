@@ -6,31 +6,29 @@ class HSLA:
     """
     `HSLA` (Hue, Saturation, Lightness, Alpha) color model.
     """
+
     __slots__ = ('_h', '_s', '_l', '_a')
 
-    def __init__(self, color: Sequence, /) -> None:
+    def __init__(self, color: Sequence[int], /) -> None:
         """
-        `RGBA` color constructor.
-
-        Attributes
+        Parameters
         ----------
-        color: `Sequence`
+        color: `Sequence[int]`
             Color sequence of h, s, l and optional a.
 
         Raises
         ------
-        `ValueError` if the color is invalid.
+        `ValueError` 
+            If the color is invalid.
         """
-        match color:
-            case tuple() | list():
-                self.h = color[0]
-                self.s = color[1]
-                self.l = color[2]
-                self.a = color[3] if len(color) == 4 else 100
-            case _:
-                raise ValueError(f"invalid color value: {color}")
-    
-    # magic methods
+        if isinstance(color, Sequence):
+            self.h = color[0]
+            self.s = color[1]
+            self.l = color[2]
+            self.a = color[3] if len(color) == 4 else 100
+        else:
+            raise ValueError(f"Invalid color value: {color}")
+
     def __eq__(self, other) -> bool:
         return isinstance(other, HSLA) and self.hsla == other.hsla
 
@@ -44,12 +42,7 @@ class HSLA:
         return f"<HSLA h={self.h}, s={self.s}, l={self.l}, a={self.a}>"
 
     def __hash__(self) -> int:
-        h = hash(self.h)
-        s = hash(self.s)
-        l = hash(self.l)
-        a = hash(self.a)
-
-        return h ^ s ^ l ^ a
+        return hash(self.hsla)
             
     def __getitem__(self, key):
         return self.hsla[key]
@@ -58,91 +51,80 @@ class HSLA:
         for item in self.hsla:
             yield item
 
-    # attributes
     @property
     def h(self) -> int:
-        """
-        Hue value in range `0-359`.
-        """
+        """Hue value in range `0-359`."""
         return self._h
     
     @h.setter
     def h(self, value: int):
-        self._h = round(value % 360)
+        value %= 360
+        if value < 0:
+            value += 360
+        self._h = round(value)
 
     hue = h
 
     @property
     def s(self) -> int:
-        """
-        Saturation value in range `0-100`.
-        """
+        """Saturation value in range `0-100`."""
         return self._s
     
     @s.setter
     def s(self, value: int):
-        self._s = min(round(value), 100)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._s = min(max(value, 0), 100)
 
     saturation = s
 
     @property
     def l(self) -> int:
-        """
-        Lightness value in range `0-100`.
-        """
+        """Lightness value in range `0-100`."""
         return self._l
     
     @l.setter
     def l(self, value: int):
-        self._l = min(round(value), 100)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._l = min(max(value, 0), 100)
 
     lightness = l
 
     @property
     def a(self) -> int:
-        """
-        Alpha value (transparency) in range `0-100`.
-        """
+        """Alpha value (transparency) in range `0-100`."""
         return self._a
     
     @a.setter
     def a(self, value: int):
-        self._a = min(round(value), 100)
+        if not isinstance(value, int):
+            raise TypeError(f"Value must be an int, not {type(value).__name__}")
+        self._a = min(max(value, 0), 100)
 
     alpha = a
 
-    # formats
     @property
     def hsl(self) -> tuple[int, int, int]:
-        """
-        Color as `(h, s, l)` tuple.
-        """
+        """`(h, s, l)` tuple."""
         return (self.h, self.s, self.l)
     
     @property
     def hsla(self) -> tuple[int, int, int, int]:
-        """
-        Color as `(h, s, l, a)` tuple.
-        """
+        """`(h, s, l, a)` tuple."""
         return (self.h, self.s, self.l, self.a)
     
-    # converters
     def copy(self) -> "HSLA":
-        """
-        Get a copy of the color.
-        """
+        """Get a copy of the color."""
         obj = HSLA.__new__(HSLA)
         obj._h = self._h
         obj._s = self._s
         obj._l = self._l
         obj._a = self._a
-
         return obj
 
     def to_rgba(self):
-        """
-        Convert the color to `RGBA` model.
-        """
+        """Convert to `RGBA` model."""
         from .rgba import RGBA
 
         h = self.h / 360.0
@@ -173,20 +155,25 @@ class HSLA:
 
         return RGBA((r, g, b, self.a * 2.55))
 
-    # utils
-    def range(self, num: int, step: int, angle: int) -> list["HSLA"]:
+    def range(
+        self, 
+        num: int, 
+        step: int, 
+        angle: int | None = None
+    ) -> list["HSLA"]:
         """
         Get a list of circular colors.
 
-        Attributes
+        Parameters
         ----------
         num: `int`
             Number of colors.
         step: `int`
-            Angle in degrees.
+            Step angle in degrees.
         angle: `int`
             Start angle.
         """
+        angle = angle or self.h
         result = []
 
         for i in range(num):
@@ -197,41 +184,27 @@ class HSLA:
         return result
 
     def complementary(self) -> "HSLA":
-        """
-        Get a complementary color.
-        """
+        """Get a complementary color."""
         color = self.copy()
         color.h += 180
         return color
     
     def split_complementary(self) -> list["HSLA"]:
-        """
-        Get 2 split complementary colors.
-        """
+        """Get 2 split-complementary colors."""
         return self.range(2, 60, self.h + 150)
     
     def triadic(self) -> list["HSLA"]:
-        """
-        Get 2 triadic colors.
-        """
+        """Get 2 triadic colors."""
         return self.range(2, 120, self.h + 120)
     
     def tetradic(self) -> list["HSLA"]:
-        """
-        Get 3 tetradic colors.
-        """
+        """Get 3 tetradic colors."""
         return self.range(3, 90, self.h + 90)
     
     def analogous(self) -> list["HSLA"]:
-        """
-        Get 3 analogous colors.
-        """
+        """Get 3 analogous colors."""
         return self.range(3, 30, self.h - 30)
     
-    # color generators
-    @staticmethod
-    def random() -> "HSLA":
-        return HSLA([
-            random.randint(0, i)
-            for i in (360, 100, 100, 100)
-        ])
+    @classmethod
+    def random(cls) -> "HSLA":
+        return cls([random.randint(0, i) for i in (360, 100, 100, 100)])

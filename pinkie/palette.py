@@ -1,61 +1,47 @@
-from typing import Iterable
+from .rgba import RGBA
 
 
 class Palette:
     """
     `RGBA` Color palette.
     """
-    _web: "Palette" = None
+    _web: "Palette" | None = None
 
-    def __init__(self, colors: Iterable) -> None:
+    def __init__(self, *colors: RGBA) -> None:
         """
         Palette constructor.
 
-        Attributes
+        Parameters
         ----------
-        colors: `Iterable[RGBA]`
+        *colors: `RGBA`
             List of colors.
 
         Raises
         ------
-        `ValueError` if the any of the colors is not `RGBA` instance.
+        `ValueError` 
+            If any of colors is not `RGBA` instance.
         """
-        from .rgba import RGBA
-
         self._items: list[RGBA] = []
-        self._bits: int = 0
+        self._bits: int | None = None
 
         for color in colors:
             self.add(color)
 
-    # magic methods
     def __eq__(self, other) -> bool:
-        return isinstance(other, Palette) and all(
-            first == second for first, second in zip(self, other))
+        return (
+            isinstance(other, Palette) 
+            and len(self) == len(other)
+            and all(first == second for first, second in zip(self, other))
+        )
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
-    
-    def __lt__(self, other):
-        return isinstance(other, Palette) and len(self.color) < len(other.color)
-    
-    def __le__(self, other):
-        return isinstance(other, Palette) and len(self.color) <= len(other.color)
-    
-    def __gt__(self, other):
-        return not self <= other
-    
-    def __ge__(self, other):
-        return not self < other
 
     def __str__(self) -> str:
         return f"Palette(num={len(self._items)})"
 
     def __repr__(self) -> str:
         return f"<Palette colors={self._items}>"
-
-    def __hash__(self) -> int:
-        return hash(self.value)
     
     def __getitem__(self, key):
         return self._items[key]
@@ -64,83 +50,91 @@ class Palette:
         for item in self._items:
             yield item
 
-    def _check(self, color):
-        from .rgba import RGBA
-        
-        if not isinstance(color, RGBA) or (self._bits and color.bits != self._bits):
-            raise ValueError("color must be instance of RGBA and have same bit count")
+    @property
+    def bits(self) -> int | None:
+        return self._bits
+    
+    @bits.setter
+    def bits(self, value: int | None):
+        if isinstance(value, int):
+            if value % 4 != 0 or value < 4:
+                raise ValueError("Number of bits must be factor of 4")
+        elif not isinstance(value, None):
+            raise ValueError("")
+        self._bits = value
 
-    # attributes
-    def add(self, color) -> None:
+    def add(self, color: RGBA, /) -> None:
         """
         Add a color to the palette.
 
-        Attributes
+        Parameters
         ----------
         color: `RGBA`
             Color to add.
 
         Raises
         ------
-        `ValueError` if the color is invalid.
+        `ValueError`
+            If the color is invalid.
         """
-        self._check(color)
+        if not isinstance(color, RGBA) or (self.bits and color.bits != self.bits):
+            raise ValueError("Color must be RGBA and have same bit count as the palette")
+        
         self._items.append(color)
 
-    def remove(self, color) -> None:
-        """
-        Remove the color to the palette.
+        if not self.bits:
+            self.bits = color.bits
 
-        Attributes
+    def remove(self, color: RGBA) -> None:
+        """
+        Remove the color from the palette.
+
+        Parameters
         ----------
         color: `RGBA`
             Color to remove.
 
         Raises
         ------
-        `ValueError` if the color is not present or is invalid.
+        `ValueError` 
+            If the color is not present.
         """
-        self._check(color)
         self._items.remove(color)
 
-    # palette generators
-    @staticmethod
-    def web() -> "Palette":
-        """
-        Get a palette of web-safe colors.
-        """
-        from .rgba import RGBA
+        if len(self._items) == 0:
+            self.bits = None
 
-        if Palette._web is None:
-            Palette._web = [
+    @classmethod
+    def web(cls) -> "Palette":
+        """Get a palette of web-safe colors."""
+        if cls._web is None:
+            cls._web = cls(*(
                 RGBA((i * 51, j * 51, k * 51)) 
                 for i in range(6) 
                 for j in range(6) 
                 for k in range(6)
-            ]
+            ))
         
-        return Palette(Palette._web)
+        return cls._web
     
-    @staticmethod
-    def random(num: int) -> "Palette":
+    @classmethod
+    def random(cls, num: int) -> "Palette":
         """
         Generate a palette with random colors.
 
-        Attributes
+        Parameters
         ----------
         num: `int`
             Number of colors.
         """
-        from .hsla import HSLA
-
-        return Palette(HSLA.random().to_rgba() for _ in range(num))
+        return cls(*(RGBA.random() for _ in range(num)))
     
-    @staticmethod
-    def gradient(start, end, num: int) -> "Palette":
+    @classmethod
+    def gradient(cls, start: RGBA, end: RGBA, num: int) -> "Palette":
         """
-        Generate a palette with colors that create gradient from start to end.
+        Generate a palette with colors that create gradient.
 
-        Attributes
+        Parameters
         ----------
         start: `RGBA`
             Start color.
@@ -151,27 +145,20 @@ class Palette:
 
         Raises
         ------
-        `ValueError` if the number < 2.
+        `ValueError`
+            If the number < 2.
         """
-        from .rgba import RGBA
-
         if num < 2:
-            raise ValueError("number of colors must be greater than or equal to 2")
+            raise ValueError("Number of colors must be greater than or equal to 2")
 
-        def interpolate(start, end, step):
-            return int(start + (end - start) * step)
-        
-        gradient = []
-        for i in range(num):
-            step = i / (num - 1) 
-
-            color = RGBA((
-                interpolate(start.r, end.r, step),
-                interpolate(start.g, end.g, step),
-                interpolate(start.b, end.b, step),
-                interpolate(start.a, end.a, step)
+        gradient = [
+            RGBA((
+                int(start.r + (end.r - start.r) * (i / (num - 1))),
+                int(start.g + (end.g - start.g) * (i / (num - 1))),
+                int(start.b + (end.b - start.b) * (i / (num - 1))),
+                int(start.a + (end.a - start.a) * (i / (num - 1)))
             ))
-           
-            gradient.append(color)
+            for i in range(num)
+        ]
 
-        return Palette(gradient)
+        return Palette(*gradient)
