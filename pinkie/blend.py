@@ -1,50 +1,37 @@
 class BlendMode:
     """
-    The base class for blending modes. 
-    Inherited classes must have overwritten `blend()` method.
+    Base class of blending modes.
     """
 
-    def __init__(self, bits: int) -> None:
-        self.bits = bits
-        self.max_one = 2 ** bits - 1
-        self.max_all = 2 ** (bits * 4) - 1
+    def _alpha(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> float:
+        return bg[3] + fg[3] - bg[3] * fg[3]
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
         """
-        Calculate the result value for each channel.
-        All arguments are in range `0-1`.
+        Blend normalized colors.
 
         Parameters
         ----------
-        bg: :class:`float`
-            Background channel value.
-        fg: `float`
-            Foreground channel value.
-        bg_a: `float`
-            Background alpha value.
-        fg_a: `float`
-            Foreground alpha value.
+        bg: `tuple[float, float, float, float]`
+            Background RGBA tuple.
+        fg: `tuple[float, float, float, float]`
+            Foreground RGBA tuple.
         """
-        raise NotImplementedError("blend mode class must have implemented 'blend' method")
-    
-    def comp(self, co: float, a: float) -> float:
-        """
-        Get a premultiplied color value with its complementary alpha.
-
-        Attributes
-        ----------
-        co: `float`
-            Color channel value.
-        a: `float`
-            Alpha value.
-        """
-        return co * (1 - a)
-    
+        raise NotImplementedError("Blend method is not implemented")
+   
     def compose(self, bg, fg):
         """
-        Compose 2 colors.
+        Compose background and foreground colors.
 
-        Attributes
+        Parameters
         ----------
         bg: `RGBA`
             Background color.
@@ -53,23 +40,23 @@ class BlendMode:
 
         Raises
         ------
-        `ValueError` if bit counts of the colors do not match.
+        `ValueError` 
+            If bit counts of the colors do not match.
         """
         from .rgba import RGBA
 
-        if bg.bits != fg.bits:
-            raise ValueError(f"can not blend colors with different size")
-        
-        maxv = self.max_one
-        bg_a = bg.a / maxv
-        fg_a = fg.a / maxv
+        bg: RGBA = bg
+        fg: RGBA = fg
 
-        return RGBA((
-            self.blend(bg.r / maxv, fg.r / maxv, bg_a, fg_a) * maxv,
-            self.blend(bg.g / maxv, fg.g / maxv, bg_a, fg_a) * maxv,
-            self.blend(bg.b / maxv, fg.b / maxv, bg_a, fg_a) * maxv,
-            (bg_a + fg_a - bg_a * fg_a) * maxv
-        ), self.bits)
+        if bg.bits != fg.bits:
+            raise ValueError(f"Cannot blend colors with different size")
+
+        bits = bg.bits
+        max_one = (1 << bits) - 1
+
+        blended = self.blend(bg.normalize(), fg.normalize())
+
+        return RGBA([round(i * max_one) for i in blended], bits=bits)
         
 
 class Normal(BlendMode):
@@ -77,8 +64,15 @@ class Normal(BlendMode):
     Normal blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return fg * fg_a + self.comp(bg, fg_a)
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return fg[num] * fg[3] + bg[num] * (1 - fg[3])
+
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
     
 
 class Darken(BlendMode):
@@ -86,35 +80,68 @@ class Darken(BlendMode):
     Darken blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return min(fg * bg_a, bg * fg_a) + self.comp(fg, bg_a) + self.comp(bg, fg_a);
-
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return (
+                min(
+                    fg[num] * bg[3], 
+                    bg[num] * fg[3]
+                ) 
+                + fg[num] * (1 - bg[3]) 
+                + bg[num] * (1 - fg[3])
+            )
+            
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
+    
 
 class Multiply(BlendMode):
     """
     Multiply blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return fg * bg + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-    
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return fg[num] * bg[num] + fg[num] * (1 - bg[3]) + bg[num] * (1 - fg[3])
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
+      
 
 class ColorBurn(BlendMode):
     """
-    Color Burn blending mode.
+    Color burn blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if fg == 0:
-            if bg == bg_a:
-                return fg_a * bg_a + self.comp(bg, fg_a)
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            if fg[num] == 0:
+                if bg[num] == bg[3]:
+                    return fg[3] * bg[3] + bg[num] * (1 - fg[3])
+                else:
+                    return bg[num] * (1 - fg[3])
             else:
-                return self.comp(bg, fg_a)
-        else:
-            return (
-                bg_a * fg_a + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-                - min(fg_a * bg_a, ((bg_a * fg_a - bg * fg_a) / fg * bg_a))
-            )
+                return (
+                    bg[3] * fg[3] 
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3])
+                    - min(
+                        fg[3] * bg[3], 
+                        ((bg[3] * fg[3] - bg[num] * fg[3]) / fg[num] * bg[3])
+                    )
+                )
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
 
 
 class Lighten(BlendMode):
@@ -122,8 +149,22 @@ class Lighten(BlendMode):
     Lighten blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return max(fg * bg_a, bg * fg_a) + self.comp(fg, bg_a) + self.comp(bg, fg_a);
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return (
+                max(
+                    fg[num] * bg[3],
+                    bg[num] * fg[3]
+                ) 
+                + fg[num] * (1 - bg[3]) 
+                + bg[num] * (1 - fg[3])
+            )
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
     
 
 class Screen(BlendMode):
@@ -131,23 +172,44 @@ class Screen(BlendMode):
     Screen blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return 1 - (1 - bg * bg_a) * (1 - fg * fg_a)
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return 1 - (1 - bg[num] * bg[3]) * (1 - fg[num] * fg[3])
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
 
 
 class ColorDodge(BlendMode):
     """
-    Color Dodge blending mode.
+    Color dodge blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if fg == fg_a:
-            if bg == 0:
-                return self.comp(fg, bg_a);
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float: 
+            if fg[num] == fg[3]:
+                if bg == 0:
+                    return fg * (1 - bg[3])
+                else:
+                    return (
+                        fg[3] * bg[3] 
+                        + fg[num] * (1 - bg[3]) 
+                        + bg[num] * (1 - fg[3])
+                    )
             else:
-                return fg_a * bg_a + self.comp(fg, bg_a) + self.comp(bg, fg_a);
-        else:
-            return min(fg_a * bg_a, bg * (fg_a / (fg_a * bg_a - fg * bg_a)));
+                return min(
+                    fg[3] * bg[3], 
+                    bg[num] * (fg[3] / (fg[3] * bg[3] - fg[num] * bg[3]))
+                )
+
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
         
 
 class Overlay(BlendMode):
@@ -155,51 +217,89 @@ class Overlay(BlendMode):
     Overlay blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if bg * 2 > bg_a:
-            return (
-                self.comp(fg, bg_a) + self.comp(bg, fg_a) 
-                - 2 * (bg_a - bg) * (fg_a - fg) + fg_a * bg_a
-            )
-        else:
-            return fg * bg * 2 + self.comp(fg, bg_a) + self.comp(bg, fg_a)
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            if bg[num] * 2 > bg[3]:
+                return (
+                    fg[3] * bg[3]
+                    - 2 * (bg[3] - bg[num]) * (fg[3] - fg[num]) 
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3]) 
+                )
+            else:
+                return (
+                    fg[num] * bg[num] * 2 
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3]) 
+                )
+            
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
         
 
 class SoftLight(BlendMode):
     """
-    Soft Light blending mode.
+    Soft light blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        fg_n = fg / fg_a
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            fg_n = fg[num] / fg[3]
 
-        if 2 * bg <= bg_a:
-            return (
-                fg * (bg_a + (2 * bg - bg_a) * (1 - fg_n))
-                + self.comp(bg, fg_a) + self.comp(fg, bg_a)
-            )
-        elif 2 * bg > bg_a and 4 * fg <= fg_a:
-            return (
-                fg_a * (2 * bg - bg_a) * (16 * fg_n**3 - 12 * fg_n**2 - 3 * fg_n)
-                + bg - bg * fg_a + fg
-            )
-        else:
-            return fg_a * (2 * bg - bg_a) * (fg_n**0.5 - fg_n) + bg - bg * fg_a + fg
+            if 2 * bg[num] <= bg[num]:
+                return (
+                    fg[num] * (bg[3] + (2 * bg[num] - bg[3]) * (1 - fg_n))
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3]) 
+                )
+            elif 2 * bg[num] > bg[3] and 4 * fg[num] <= fg[3]:
+                return (
+                    fg[3] * (2 * bg[num] - bg[3]) 
+                    * (16 * fg_n ** 3 - 12 * fg_n ** 2 - 3 * fg_n)
+                    + bg[num] - bg[num] * fg[3] + fg[num]
+                )
+            else:
+                return (
+                    fg[3] * (2 * bg[num] - bg[3]) 
+                    * (fg_n ** 0.5 - fg_n) 
+                    + bg[num] - bg[num] * fg[3] + fg[num]
+                )
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
 
 
 class HardLight(BlendMode):
     """
-    Hard Light blending mode.
+    Hard light blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        if fg * 2 > fg_a:
-            return (
-                fg_a * bg_a - 2 * (bg_a - bg) * (fg_a - fg) 
-                + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-            )
-        else:
-            return 2 * fg * bg + self.comp(fg, bg_a) + self.comp(bg, fg_a)
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            if fg[num] * 2 > fg[3]:
+                return (
+                    fg[3] * bg[3] - 2 * (bg[3] - bg[num]) * (fg[3] - fg[num]) 
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3]) 
+                )
+            else:
+                return (
+                    2 * fg[num] * bg[num]
+                    + fg[num] * (1 - bg[3]) 
+                    + bg[num] * (1 - fg[3]) 
+                )
+            
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
         
         
 class Difference(BlendMode):
@@ -207,18 +307,38 @@ class Difference(BlendMode):
     Difference blending mode.
     """
 
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return fg + bg - 2 * min(fg * bg_a, bg * fg_a);
-
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return (
+                fg[num] + bg[num] 
+                - 2 * min(fg[num] * bg[3], bg[num] * fg[3])
+            )
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
+                
 
 class Exclusion(BlendMode):
     """
     Exclusion blending mode.
     """
     
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return (
-            (fg * bg_a + bg * fg_a - 2 * fg * bg) 
-            + self.comp(fg, bg_a) + self.comp(bg, fg_a)
-        )
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        def _ch(num: int) -> float:
+            return (
+                fg[num] * bg[3] 
+                + bg[num] * fg[3] 
+                - 2 * fg[num] * bg[num]
+                + fg[num] * (1 - bg[3]) 
+                + bg[num] * (1 - fg[3]) 
+            )
+        
+        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
     

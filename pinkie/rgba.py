@@ -29,7 +29,7 @@ class RGBA:
         self._max_all: int = (1 << (bits * 4)) - 1
 
         if isinstance(color, int):
-            self._data = (color & self._max_all) | (self._max_one << (self.bits * 3))
+            self._data = color
         elif isinstance(color, str):
             color = color.removeprefix('#')
             
@@ -47,10 +47,11 @@ class RGBA:
             
             if len(color) == 3:
                 color = (*color, self._max_one)
+
             
             self._data = sum(
                 min(max(c, 0), self._max_one) << (num * self.bits) 
-                for num, c in enumerate(color)
+                for num, c in enumerate(reversed(color))
             )
         else:
             raise ValueError(f"Invalid color value: {color}")
@@ -322,30 +323,32 @@ class RGBA:
 
         return max(colors, key=lambda c: distance(self, c))
     
-    # TODO
     def blend(self, other: "RGBA", mode) -> "RGBA":
         """
         Blend the color with another one. 
-        Second color will be placed on top of this.
 
         Parameters
         ----------
         other: `RGBA`
             Foreground color.
         mode: `BlendMode`
-            Blending mode. Must be a child class of `BlendMode`.
+            Blending mode.
 
         Raises
         ------
         `ValueError` 
-            If the mode is invalid or bit counts of the colors do not match.
+            If bit counts of the colors do not match.
+        `TypeError`
+            If blend mode is invalid.
         """
         from .blend import BlendMode
 
-        if not issubclass(mode, BlendMode):
-            raise ValueError(f"blend mode must be inherited from the {BlendMode.__name__} class")
+        if not isinstance(mode, BlendMode):
+            raise TypeError(
+                f"Mode must be {BlendMode.__name__}, not {type(mode).__name__}"
+            )
 
-        return mode(self.bits).compose(self, other)
+        return mode.compose(self, other)
     
     @classmethod
     def random(cls, bits: int = 8) -> "RGBA":
