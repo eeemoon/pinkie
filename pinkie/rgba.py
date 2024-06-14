@@ -5,9 +5,7 @@ from .utils import distance
 
 
 class RGBA:
-    """
-    RGBA (Red, Green, Blue, Alpha) color model.
-    """
+    """RGBA (Red, Green, Blue, Alpha) color model."""
 
     __slots__ = ('_data', '_bits', '_max_one', '_max_all')
 
@@ -18,7 +16,7 @@ class RGBA:
         color: `int` | `str` | `Sequence[int]`
             Decimal value, hex or a sequence of r, g, b and optional a.
         bits: `int`
-            Number of bits per channel. Must be a multiple of 4.
+            Number of bits per channel. Must be dividable by 4.
             Defaults to 8 bits, which equals 256 values per channel.
 
         Raises
@@ -96,7 +94,7 @@ class RGBA:
     @bits.setter
     def bits(self, value: int):
         if value % 4 != 0 or value < 4:
-            raise ValueError(f"Number of bits must be factor of 4")
+            raise ValueError("Number of bits must be dividable by 4")
         
         self._bits = value
 
@@ -239,7 +237,7 @@ class RGBA:
         Parameters
         ----------
         bits: `int`
-            Number of bits per channel. Must be factor of 4. 
+            Number of bits per channel. Must be dividable by 4. 
         """
         scale = (1 << bits) // (1 << self.bits)
         maxv = (1 << bits) - 1

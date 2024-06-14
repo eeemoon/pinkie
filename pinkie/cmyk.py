@@ -3,9 +3,7 @@ from typing import Sequence
 
 
 class CMYK:
-    """
-    `CMYK` (Cyan, Magenta, Yellow, Black Key) color model.
-    """
+    """`CMYK` (Cyan, Magenta, Yellow, Black Key) color model."""
 
     __slots__ = ('_c', '_m', '_y', '_k')
 

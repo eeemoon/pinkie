@@ -3,9 +3,7 @@ from typing import Sequence
 
 
 class HSLA:
-    """
-    `HSLA` (Hue, Saturation, Lightness, Alpha) color model.
-    """
+    """`HSLA` (Hue, Saturation, Lightness, Alpha) color model."""
 
     __slots__ = ('_h', '_s', '_l', '_a')
 

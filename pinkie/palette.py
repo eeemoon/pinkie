@@ -2,9 +2,8 @@ from .rgba import RGBA
 
 
 class Palette:
-    """
-    `RGBA` Color palette.
-    """
+    """`RGBA` Color palette."""
+
     _web: "Palette" | None = None
 
     def __init__(self, *colors: RGBA) -> None:
@@ -58,9 +57,10 @@ class Palette:
     def bits(self, value: int | None):
         if isinstance(value, int):
             if value % 4 != 0 or value < 4:
-                raise ValueError("Number of bits must be factor of 4")
+                raise ValueError("Number of bits must be dividable by 4")
         elif not isinstance(value, None):
-            raise ValueError("")
+            raise ValueError("Invalid value")
+        
         self._bits = value
 
     def add(self, color: RGBA, /) -> None:
