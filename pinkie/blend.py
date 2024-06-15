@@ -8,8 +8,8 @@ class BlendMode:
         bg: tuple[float, float, float, float], 
         fg: tuple[float, float, float, float]
     ) -> float:
-        return bg[3] + fg[3] - bg[3] * fg[3]
-
+        return bg[3] + fg[3] * (1 - bg[3])
+    
     def blend(
         self, 
         bg: tuple[float, float, float, float], 
@@ -69,10 +69,15 @@ class Normal(BlendMode):
         bg: tuple[float, float, float, float], 
         fg: tuple[float, float, float, float]
     ) -> tuple[float, float, float, float]:
-        def _ch(num: int) -> float:
-            return fg[num] * fg[3] + bg[num] * (1 - fg[3])
+        a = self._alpha(bg, fg)
 
-        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
+        if a == 0:
+            return 0, 0, 0, 0
+
+        def _ch(num: int) -> float:
+            return (fg[num] * fg[3] + bg[num] * bg[3] * (1 - fg[3])) / a
+
+        return _ch(0), _ch(1), _ch(2), a
     
 
 class Darken(BlendMode):
@@ -85,6 +90,8 @@ class Darken(BlendMode):
         bg: tuple[float, float, float, float], 
         fg: tuple[float, float, float, float]
     ) -> tuple[float, float, float, float]:
+        a = self._alpha(bg, fg)
+
         def _ch(num: int) -> float:
             return (
                 min(
@@ -93,9 +100,9 @@ class Darken(BlendMode):
                 ) 
                 + fg[num] * (1 - bg[3]) 
                 + bg[num] * (1 - fg[3])
-            )
+            ) / a
             
-        return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
+        return _ch(0), _ch(1), _ch(2), a
     
 
 class Multiply(BlendMode):
@@ -126,10 +133,9 @@ class ColorBurn(BlendMode):
     ) -> tuple[float, float, float, float]:
         def _ch(num: int) -> float:
             if fg[num] == 0:
-                if bg[num] == bg[3]:
-                    return fg[3] * bg[3] + bg[num] * (1 - fg[3])
-                else:
-                    return bg[num] * (1 - fg[3])
+                return bg[num] * (1 - fg[3])
+            elif bg[num] == bg[3]:
+                return fg[3] * bg[3] + bg[num] * (1 - fg[3])
             else:
                 return (
                     bg[3] * fg[3] 
@@ -195,18 +201,19 @@ class ColorDodge(BlendMode):
     ) -> tuple[float, float, float, float]:
         def _ch(num: int) -> float: 
             if fg[num] == fg[3]:
-                if bg == 0:
-                    return fg * (1 - bg[3])
+                if bg[num] == 0:
+                    return fg[num] * (1 - bg[3])
                 else:
-                    return (
-                        fg[3] * bg[3] 
-                        + fg[num] * (1 - bg[3]) 
-                        + bg[num] * (1 - fg[3])
-                    )
+                    return fg[3] * bg[3] + fg[num] * (1 - bg[3]) + bg[num] * (1 - fg[3])
             else:
-                return min(
-                    fg[3] * bg[3], 
-                    bg[num] * (fg[3] / (fg[3] * bg[3] - fg[num] * bg[3]))
+                denominator = fg[3] * bg[3] - fg[num] * bg[3]
+                return (
+                    fg[3] * bg[3]
+                    if denominator == 0 
+                    else min(
+                        fg[3] * bg[3], 
+                        bg[num] * (fg[3] / denominator)
+                    )
                 )
 
         return _ch(0), _ch(1), _ch(2), self._alpha(bg, fg)
@@ -251,9 +258,12 @@ class SoftLight(BlendMode):
         fg: tuple[float, float, float, float]
     ) -> tuple[float, float, float, float]:
         def _ch(num: int) -> float:
+            if fg[3] == 0:
+                return bg[num]
+            
             fg_n = fg[num] / fg[3]
 
-            if 2 * bg[num] <= bg[num]:
+            if 2 * bg[num] <= bg[3]:
                 return (
                     fg[num] * (bg[3] + (2 * bg[num] - bg[3]) * (1 - fg_n))
                     + fg[num] * (1 - bg[3]) 
