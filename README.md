@@ -62,15 +62,24 @@ from pinkie import Color
 bg = Color('ffd015ff')
 fg = Color('ff15bd80')
 
-bg.blend(fg, blend.Normal) # FF7269FF
+bg.blend(fg, blend.Normal()) # FF7269FF
 ```
 and create your own blending mode:
 ```python
-class MyBlend(blend.BlendMode):
-    def blend(self, bg: float, fg: float, bg_a: float, fg_a: float) -> float:
-        return bg * fg
+class MyBlend(BlendMode):
+    def blend(
+        self, 
+        bg: tuple[float, float, float, float], 
+        fg: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        a = self._alpha(bg, fg)
 
-bg.blend(fg, MyBlend)
+        def _ch(num: int) -> float:
+            return bg[num] * fg[num]
+
+        return _ch(0), _ch(1), _ch(2), a
+
+bg.blend(fg, MyBlend())
 ```
 
 ### Harmonic colors
@@ -78,7 +87,7 @@ There are various methods to get harmonic colors:
 ```python
 color.complementary() # complementary color
 color.triadic() # list of triadic colors
-color.closest([Color('ffffff'), Color('000000')]) # closest color from the list
+color.closest(Color('ffffff'), Color('000000')) # closest color from the list
 ...
 ```
 
@@ -87,7 +96,7 @@ Palettes are just sequences of colors. You can manage them like this:
 ```python
 from pinkie import Color, Palette
 
-palette = Palette([Color('ffffff'), Color('4c66a1')])
+palette = Palette(Color('ffffff'), Color('4c66a1'))
 palette.add(Color('16c235'))
 palette.remove(Color('ffffff'))
 
